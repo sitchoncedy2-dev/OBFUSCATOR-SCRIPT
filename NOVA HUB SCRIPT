@@ -1,0 +1,526 @@
+-- NOVA HUB PART 1
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local LocalPlayer = Players.LocalPlayer
+local RemoteEvents = ReplicatedStorage:WaitForChild("rEvents", 5)
+local MuscleEvent = ReplicatedStorage:WaitForChild("muscleEvent", 5)
+
+getgenv().autoRep = false
+getgenv().autoRebirth = false
+getgenv().autoHatch = false
+getgenv().autoSell = false
+getgenv().autoEvolve = false
+getgenv().autoTitan = false
+getgenv().autoQuest = false
+getgenv().autoSpin = false
+getgenv().doubleEquip = false
+getgenv().autoKillSelected = false
+getgenv().autoKillAll = false
+getgenv().selectedPlayer = nil
+getgenv().evolveMode = "Both"
+getgenv().titanMode = "Both"
+
+local startTime = os.time()
+local uniquePetsEquipped = false
+local omegaPetsEquipped = false
+
+local gyms = {
+    {"Spawn", CFrame.new(2, 8, 115)},
+    {"Secret Spot", CFrame.new(1947, 2, 6191)},
+    {"Tiny Island", CFrame.new(-34, 7, 1903)},
+    {"Frozen Island", CFrame.new(-2600, 4, -404)},
+    {"Mythical Island", CFrame.new(2255, 7, 1071)},
+    {"Hell Island", CFrame.new(-6768, 7, -1287)},
+    {"Legend Island", CFrame.new(4604, 991, -3887)},
+    {"Muscle King Island", CFrame.new(-8646, 17, -5738)},
+    {"Jungle Island", CFrame.new(-8659, 6, 2384)},
+    {"Industrial Island", CFrame.new(-5437.2, 60.5, 4929.2)},
+    {"Brawl Lava", CFrame.new(4471, 119, -8836)},
+    {"Brawl Desert", CFrame.new(960, 17, -7398)},
+    {"Brawl Regular", CFrame.new(-1849, 20, -6335)}
+}
+
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+local function createAfkDisplay(character)
+    if not character then return end
+    local head = character:WaitForChild("Head", 5)
+    if not head or head:FindFirstChild("AFK_Tag") then return end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "AFK_Tag"
+    billboard.Size = UDim2.new(0, 170, 0, 28)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "NOVA ANTI-AFK [00:00:00]"
+    label.TextColor3 = Color3.fromRGB(0, 255, 200)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 12
+    label.TextStrokeTransparency = 0.2
+    label.Parent = billboard
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.4
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Parent = label
+    task.spawn(function()
+        while billboard and billboard.Parent do
+            local elapsed = os.time() - startTime
+            local h = math.floor(elapsed / 3600)
+            local m = math.floor((elapsed % 3600) / 60)
+            local s = elapsed % 60
+            label.Text = string.format("NOVA ANTI-AFK [%02d:%02d:%02d]", h, m, s)
+            task.wait(1)
+        end
+    end)
+end
+
+if LocalPlayer.Character then createAfkDisplay(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(createAfkDisplay)
+
+local function getEquippedTool()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and not string.find(string.lower(tool.Name), "punch") then return tool end
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            if item:IsA("Tool") and not string.find(string.lower(item.Name), "punch") then
+                char.Humanoid:EquipTool(item)
+                return item
+            end
+        end
+    end
+    return nil
+end
+
+local function massTogglePets(rarity, state)
+    pcall(function()
+        local equipRemote = RemoteEvents:FindFirstChild("equipPetEvent")
+        local petsFolder = LocalPlayer:FindFirstChild("petsFolder")
+        local rarityFolder = petsFolder and petsFolder:FindFirstChild(rarity)
+        if equipRemote and rarityFolder then
+            for _, pet in ipairs(rarityFolder:GetChildren()) do
+                equipRemote:FireServer(state and "equipPet" or "unequipPet", pet)
+                task.wait(0.02)
+            end
+        end
+    end)
+end
+
+local function massSellPets(rarity)
+    pcall(function()
+        local sellRemote = RemoteEvents:FindFirstChild("sellPetEvent")
+        local petsFolder = LocalPlayer:FindFirstChild("petsFolder")
+        local rarityFolder = petsFolder and petsFolder:FindFirstChild(rarity)
+        if sellRemote and rarityFolder then
+            for _, pet in ipairs(rarityFolder:GetChildren()) do
+                sellRemote:FireServer("sellPet", pet)
+            end
+        end
+    end)
+end
+
+local function teleportTo(cframe)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if root then root.CFrame = cframe end
+end
+
+getgenv().NovaHelpers = {
+    getEquippedTool = getEquippedTool,
+    massTogglePets = massTogglePets,
+    massSellPets = massSellPets,
+    teleportTo = teleportTo,
+    RemoteEvents = RemoteEvents,
+    MuscleEvent = MuscleEvent,
+    uniquePetsEquipped = uniquePetsEquipped,
+    omegaPetsEquipped = omegaPetsEquipped,
+    gyms = gyms
+}
+
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+getgenv().WindUI = WindUI
+
+local Window = WindUI:CreateWindow({
+    Title = "NOVA HUB",
+    Author = "Muscle Legends",
+    Folder = "NOVAHUBConfigs",
+    Size = UDim2.fromOffset(580, 500),
+    Transparent = true,
+    Theme = "Dark"
+})
+getgenv().NovaWindow = Window
+
+local MainTab = Window:Tab({ Title = "Main", Icon = "home" })
+local PetTab = Window:Tab({ Title = "Pets and Crystals", Icon = "paw-print" })
+local TeleportTab = Window:Tab({ Title = "Teleports", Icon = "map-pin" })
+getgenv().NovaTabs = {Main = MainTab, Pet = PetTab, Teleport = TeleportTab}
+
+MainTab:Section({ Title = "Auto Farm Settings" })
+MainTab:Toggle({
+    Title = "Auto Fast Reps",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoRep = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoRep do
+                    pcall(function()
+                        local tool = getEquippedTool()
+                        if MuscleEvent then for i = 1, 3 do MuscleEvent:FireServer("rep") end end
+                        if tool then tool:Activate() end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+MainTab:Toggle({
+    Title = "Fast Auto Rebirth",
+    Desc = "Rapidly attempts to rebirth",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoRebirth = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoRebirth do
+                    pcall(function()
+                        if MuscleEvent then MuscleEvent:FireServer("rebirthRequest") end
+                        local r = RemoteEvents and RemoteEvents:FindFirstChild("rebirthRemote")
+                        if r then r:InvokeServer("rebirthRequest") end
+                    end)
+                    task.wait(0.35)
+                end
+            end)
+        end
+    end
+})
+
+PetTab:Section({ Title = "Crystal Opener" })
+PetTab:Toggle({
+    Title = "Auto Open Secret Void Crystal",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoHatch = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoHatch do
+                    local r = RemoteEvents:FindFirstChild("openCrystalRemote")
+                    if r then pcall(function() r:InvokeServer("openCrystal", "Secret Void Crystal", 1) end) end
+                    task.wait(0.15)
+                end
+            end)
+        end
+    end
+})
+PetTab:Section({ Title = "Mass Equip / Unequip" })
+PetTab:Button({
+    Title = "Equip / Unequip All Unique Pets",
+    Callback = function()
+        uniquePetsEquipped = not uniquePetsEquipped
+        massTogglePets("Unique", uniquePetsEquipped)
+        WindUI:Notify({Title="Unique Pets", Content=uniquePetsEquipped and "Equipped!" or "Unequipped!", Duration=3})
+    end
+})
+PetTab:Button({
+    Title = "Equip / Unequip All Omega Pets",
+    Callback = function()
+        omegaPetsEquipped = not omegaPetsEquipped
+        massTogglePets("Omega", omegaPetsEquipped)
+        WindUI:Notify({Title="Omega Pets", Content=omegaPetsEquipped and "Equipped!" or "Unequipped!", Duration=3})
+    end
+})
+PetTab:Section({ Title = "Auto Sell" })
+PetTab:Toggle({
+    Title = "Auto Sell Epic Pets",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoSell = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoSell do massSellPets("Epic") task.wait(0.5) end
+            end)
+        end
+    end
+})
+PetTab:Section({ Title = "Auto Normal Evolve" })
+PetTab:Dropdown({
+    Title = "Normal Evolve Target Filter",
+    Values = {"Both", "Epic", "Unique", "Omega", "All"},
+    Value = "Both",
+    Callback = function(Option) getgenv().evolveMode = Option end
+})
+PetTab:Toggle({
+    Title = "Auto Evolve Pets",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoEvolve = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoEvolve do
+                    local mode = getgenv().evolveMode
+                    local targets = mode == "Both" and {"Epic","Unique"} or mode == "All" and {"Common","Uncommon","Rare","Epic","Unique","Omega"} or {mode}
+                    for _, rarity in ipairs(targets) do
+                        local folder = LocalPlayer:FindFirstChild("petsFolder") and LocalPlayer.petsFolder:FindFirstChild(rarity)
+                        local evolveRemote = RemoteEvents:FindFirstChild("petEvolveEvent")
+                        if folder and evolveRemote then
+                            for _, pet in ipairs(folder:GetChildren()) do
+                                if not string.find(pet.Name, "Evolved") and not string.find(pet.Name, "Titan") then
+                                    evolveRemote:FireServer("evolvePet", pet)
+                                    task.wait(0.08)
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end
+})
+PetTab:Section({ Title = "Auto Titan Evolve" })
+PetTab:Dropdown({
+    Title = "Titan Evolve Target Filter",
+    Values = {"Both", "Epic", "Unique", "Omega", "All"},
+    Value = "Both",
+    Callback = function(Option) getgenv().titanMode = Option end
+})
+PetTab:Toggle({
+    Title = "Auto Titan Evolve Pets",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoTitan = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoTitan do
+                    local mode = getgenv().titanMode
+                    local targets = mode == "Both" and {"Epic","Unique"} or mode == "All" and {"Common","Uncommon","Rare","Epic","Unique","Omega"} or {mode}
+                    for _, rarity in ipairs(targets) do
+                        local folder = LocalPlayer:FindFirstChild("petsFolder") and LocalPlayer.petsFolder:FindFirstChild(rarity)
+                        local evolveRemote = RemoteEvents:FindFirstChild("petEvolveEvent")
+                        if folder and evolveRemote then
+                            for _, pet in ipairs(folder:GetChildren()) do
+                                if not string.find(pet.Name, "Titan") then
+                                    evolveRemote:FireServer("evolveTitan", pet)
+                                    task.wait(0.08)
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end
+})
+
+TeleportTab:Section({ Title = "Teleport Locations" })
+for _, gymInfo in ipairs(gyms) do
+    TeleportTab:Button({
+        Title = "Teleport to " .. gymInfo[1],
+        Callback = function() teleportTo(gymInfo[2]) end
+    })
+end
+
+print("✅ PART 1 loaded - now execute PART 2")
+-- NOVA HUB PART 2
+if not getgenv().NovaWindow then
+    warn("Execute PART 1 first!")
+    return
+end
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Window = getgenv().NovaWindow
+local WindUI = getgenv().WindUI
+local RemoteEvents = getgenv().NovaHelpers.RemoteEvents
+local MuscleEvent = getgenv().NovaHelpers.MuscleEvent
+
+local function equipPunch()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not char then return end
+    local punch = char:FindFirstChild("Punch") or (backpack and backpack:FindFirstChild("Punch"))
+    if punch and punch.Parent == backpack then
+        char.Humanoid:EquipTool(punch)
+    end
+    return punch
+end
+
+local function killPlayer(target)
+    if not target or not target.Character then return end
+    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot or not myRoot then return end
+    myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+    local punch = equipPunch()
+    if punch then punch:Activate() end
+    pcall(function()
+        if MuscleEvent then
+            MuscleEvent:FireServer("punch")
+            MuscleEvent:FireServer("rep")
+        end
+    end)
+end
+
+local MiscTab = Window:Tab({ Title = "Misc", Icon = "settings" })
+local KillTab = Window:Tab({ Title = "Killing", Icon = "swords" })
+
+MiscTab:Section({ Title = "Quests & Rewards" })
+MiscTab:Toggle({
+    Title = "Auto Claim Quest",
+    Desc = "Automatically claims available quests",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoQuest = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoQuest do
+                    pcall(function()
+                        local r = RemoteEvents:FindFirstChild("questRemote") or RemoteEvents:FindFirstChild("claimQuestRemote") or RemoteEvents:FindFirstChild("questsEvent")
+                        if r then
+                            if r:IsA("RemoteEvent") then r:FireServer("claimQuest") r:FireServer("claimAll")
+                            else r:InvokeServer("claimQuest") r:InvokeServer("claimAll") end
+                        end
+                    end)
+                    task.wait(2)
+                end
+            end)
+        end
+    end
+})
+MiscTab:Toggle({
+    Title = "Auto Spin (Fortune)",
+    Desc = "Automatically spins the daily fortune wheel",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoSpin = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoSpin do
+                    pcall(function()
+                        local r = RemoteEvents:FindFirstChild("spinRemote") or RemoteEvents:FindFirstChild("fortuneRemote") or RemoteEvents:FindFirstChild("dailySpinRemote") or RemoteEvents:FindFirstChild("wheelRemote")
+                        if r then
+                            if r:IsA("RemoteEvent") then r:FireServer("spin") r:FireServer("spinWheel")
+                            else r:InvokeServer("spin") r:InvokeServer("spinWheel") end
+                        end
+                    end)
+                    task.wait(3)
+                end
+            end)
+        end
+    end
+})
+MiscTab:Section({ Title = "Tools" })
+MiscTab:Toggle({
+    Title = "Double Equip (Weight + Pushups)",
+    Desc = "Keeps both Weight and Pushups ready",
+    Value = false,
+    Callback = function(Value)
+        getgenv().doubleEquip = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().doubleEquip do
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local bp = LocalPlayer:FindFirstChild("Backpack")
+                        if not char or not bp then return end
+                        local w = bp:FindFirstChild("Weight") or char:FindFirstChild("Weight")
+                        local p = bp:FindFirstChild("Pushups") or char:FindFirstChild("Pushups") or bp:FindFirstChild("Push Ups")
+                        if w and w.Parent == bp then char.Humanoid:EquipTool(w) task.wait(0.15) end
+                        if p and p.Parent == bp then char.Humanoid:EquipTool(p) end
+                    end)
+                    task.wait(0.8)
+                end
+            end)
+        end
+    end
+})
+
+KillTab:Section({ Title = "Player Selection" })
+local function getPlayerNames()
+    local names = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr \~= LocalPlayer then table.insert(names, plr.Name) end
+    end
+    return names
+end
+local playerNames = getPlayerNames()
+KillTab:Dropdown({
+    Title = "Select Player",
+    Desc = "Choose who you want to kill",
+    Values = #playerNames > 0 and playerNames or {"None"},
+    Value = playerNames[1] or "None",
+    Callback = function(selected)
+        getgenv().selectedPlayer = selected
+        pcall(function() WindUI:Notify({Title="Target Selected", Content="Now targeting: "..tostring(selected), Duration=2}) end)
+    end
+})
+KillTab:Button({
+    Title = "Refresh Player List",
+    Callback = function()
+        pcall(function() WindUI:Notify({Title="Info", Content="Rejoin or re-execute to fully refresh list.", Duration=3}) end)
+    end
+})
+Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    pcall(function() WindUI:Notify({Title="Player Joined", Content="New player joined. Re-select if needed.", Duration=2}) end)
+end)
+
+KillTab:Section({ Title = "Kill Options" })
+KillTab:Toggle({
+    Title = "Auto Kill Selected Player",
+    Desc = "Keeps killing the selected player",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoKillSelected = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoKillSelected do
+                    pcall(function()
+                        local name = getgenv().selectedPlayer
+                        if name and name \~= "None" then
+                            local target = Players:FindFirstChild(name)
+                            if target then killPlayer(target) end
+                        end
+                    end)
+                    task.wait(0.25)
+                end
+            end)
+        end
+    end
+})
+KillTab:Toggle({
+    Title = "Auto Kill Everyone",
+    Desc = "Kills every player one by one",
+    Value = false,
+    Callback = function(Value)
+        getgenv().autoKillAll = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().autoKillAll do
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr \~= LocalPlayer then
+                            pcall(function() killPlayer(plr) end)
+                            task.wait(0.4)
+                        end
+                    end
+                    task.wait(0.6)
+                end
+            end)
+        end
+    end
+})
+
+WindUI:Notify({Title="NOVA HUB", Content="Fully loaded! (Part 1 + Part 2)", Duration=4})
+print("✅ PART 2 loaded - NOVA HUB ready!")
